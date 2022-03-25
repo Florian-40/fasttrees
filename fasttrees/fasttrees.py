@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import itertools
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.metrics.scorer import balanced_accuracy_score
+from sklearn.metrics import balanced_accuracy_score
 import operator
 import logging
 
@@ -62,7 +62,7 @@ class FastFrugalTreeClassifier(BaseEstimator, ClassifierMixin):
             and scorer
         """
         midx = pd.MultiIndex(levels=[[], []],
-                             labels=[[], []],
+                             codes=[[], []],
                              names=['cue_nr', 'threshold_nr'])
         threshold_df = pd.DataFrame(columns=['feature', 'direction', 'threshold', 'type', self.scorer.__name__],
                                     index=midx)
@@ -155,13 +155,13 @@ class FastFrugalTreeClassifier(BaseEstimator, ClassifierMixin):
             Returns:
                 Series with prediction for all cues used
             """
-            ret_ser = pd.Series()
+            ret_ser = pd.Series(dtype='float64')
             for index, cue_row in cue_df.iterrows():
                 operator = operator_dict[cue_row['direction']]
                 outcome = operator(row[cue_row['feature']], cue_row['threshold'])
 
                 # store prediction in series
-                ret_ser.set_value(index, outcome)
+                ret_ser.at[index]= outcome
 
                 # exit tree if outcome is exit or last cue reached
                 if (cue_row['exit'] == int(outcome)) or (index + 1 == nr_rows):
@@ -220,7 +220,7 @@ class FastFrugalTreeClassifier(BaseEstimator, ClassifierMixin):
         """
         relevant_features = self.thresholds.head(self.max_levels)
         midx = pd.MultiIndex(levels=[[], []],
-                             labels=[[], []],
+                             codes=[[], []],
                              names=['tree', 'idx'])
         tree_df = pd.DataFrame(
             columns=['feature', 'direction', 'threshold', 'type', self.scorer.__name__, 'fraction_used'], index=midx)
@@ -268,13 +268,13 @@ class FastFrugalTreeClassifier(BaseEstimator, ClassifierMixin):
 
         if decision_view:
             def exit_action(exit):
-                ret_ser = pd.Series()
-                ret_ser.set_value('IF YES', '↓')
-                ret_ser.set_value('IF NO', '↓')
+                ret_ser = pd.Series(dtype='float64')
+                ret_ser.at['IF YES']= '↓'
+                ret_ser.at['IF NO']= '↓'
                 if exit <= 0.5:
-                    ret_ser.set_value('IF NO', 'decide NO')
+                    ret_ser.at['IF NO']= 'decide NO'
                 if exit >= 0.5:
-                    ret_ser.set_value('IF YES', 'decide YES')
+                    ret_ser.at['IF YES']= 'decide YES'
                 return ret_ser
 
             tree_df = pd.concat([tree_df, tree_df['exit'].apply(exit_action)], axis=1)
